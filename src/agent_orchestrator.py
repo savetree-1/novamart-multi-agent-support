@@ -135,22 +135,28 @@ def _register_agentcore_compat_methods():
         class_attributes['put_agent_runtime_logging_configuration'] = put_agent_runtime_logging_configuration
 
     import boto3 as _boto3
-    if _boto3.DEFAULT_SESSION is not None:
-        _boto3.DEFAULT_SESSION._session.register(
-            'creating-client-class.bedrock-agentcore', _add_methods
-        )
-    else:
-        import botocore.session as _bc_session
-        _original_get = _bc_session.get_session
+    import botocore.session as _bc_session
 
-        def _patched_get(*args, **kwargs):
-            sess = _original_get(*args, **kwargs)
-            sess.register('creating-client-class.bedrock-agentcore', _add_methods)
-            return sess
+    def _register_on_session(session):
+        session.register('creating-client-class.bedrock-agentcore', _add_methods)
+        session.register('creating-client-class.bedrock-agentcore-control', _add_methods)
 
-        _bc_session.get_session = _patched_get
+    # Register on default session if already initialized
+    default_sess = _boto3._get_default_session()
+    if default_sess is not None:
+        _register_on_session(default_sess._session)
+
+    _original_get = _bc_session.get_session
+
+    def _patched_get(*args, **kwargs):
+        sess = _original_get(*args, **kwargs)
+        _register_on_session(sess)
+        return sess
+
+    _bc_session.get_session = _patched_get
 
 _register_agentcore_compat_methods()
+
 
 
 # ═══════════════════════════════════════════════════════
@@ -482,7 +488,7 @@ def build_policy_agent() -> Agent:
     @tool
     def retrieve_returns_policy(query: str) -> str:
         """Retrieve relevant passages from the Returns Policy knowledge base."""
-        return retrieve_from_knowledge_base(query, config.RETURNS_KB_ID)
+        return retrieve_from_knowledge_base(config.RETURNS_KB_ID, query)
 
     returns_retriever = Agent(
         name="ReturnsPolicyRetrieverAgent",
@@ -494,7 +500,7 @@ def build_policy_agent() -> Agent:
     @tool
     def retrieve_shipping_policy(query: str) -> str:
         """Retrieve relevant passages from the Shipping Policy knowledge base."""
-        return retrieve_from_knowledge_base(query, config.SHIPPING_KB_ID)
+        return retrieve_from_knowledge_base(config.SHIPPING_KB_ID, query)
 
     shipping_retriever = Agent(
         name="ShippingPolicyRetrieverAgent",
@@ -506,7 +512,7 @@ def build_policy_agent() -> Agent:
     @tool
     def retrieve_warranty_policy(query: str) -> str:
         """Retrieve relevant passages from the Warranty Policy knowledge base."""
-        return retrieve_from_knowledge_base(query, config.WARRANTY_KB_ID)
+        return retrieve_from_knowledge_base(config.WARRANTY_KB_ID, query)
 
     warranty_retriever = Agent(
         name="WarrantyPolicyRetrieverAgent",
@@ -947,33 +953,65 @@ def deploy_to_agentcore_runtime(
     )
     print(f"  Artifact uploaded: s3://{config.POLICY_BUCKET}/{artifact_key}")
 
-    response = agentcore_control.create_agent_runtime(
-        agentRuntimeName=runtime_name,
-        description="NovaMart Multi-Agent Customer Support System Runtime",
-        roleArn=config.AGENTCORE_ROLE_ARN,
-        networkConfiguration={'networkType': 'PUBLIC'},
-        protocolConfiguration={'protocol': 'MCP'},
-        agentRuntimeArtifact={
-            'artifactLocation': {
-                's3Location': {
-                    'bucket': config.POLICY_BUCKET,
-                    'prefix': artifact_key,
+    try:
+        response = agentcore_control.create_agent_runtime(
+            agentRuntimeName=runtime_name,
+            description="NovaMart Multi-Agent Customer Support System Runtime",
+            roleArn=config.AGENTCORE_ROLE_ARN,
+            networkConfiguration={'networkMode': 'PUBLIC'},
+            protocolConfiguration={'serverProtocol': 'MCP'},
+            agentRuntimeArtifact={
+                'codeConfiguration': {
+                    'code': {
+                        's3': {
+                            'bucket': config.POLICY_BUCKET,
+                            'prefix': artifact_key,
+                        }
+                    },
+                    'runtime': 'PYTHON_3_12',
+                    'entryPoint': ['main.py']
                 }
             },
-            'runtime': 'PYTHON_3_12',
-        },
-        environmentVariables={
-            'AWS_REGION': config.AWS_REGION,
-            'PROJECT_NAME': config.PROJECT_NAME,
-            'RETURNS_KB_ID': config.RETURNS_KB_ID,
-            'SHIPPING_KB_ID': config.SHIPPING_KB_ID,
-            'WARRANTY_KB_ID': config.WARRANTY_KB_ID,
-            'AGENT_LOG_GROUP': config.AGENT_LOG_GROUP,
-            'GUARDRAIL_ID': guardrail_id,
-            'GUARDRAIL_VERSION': guardrail_version,
-        }
-    )
+            environmentVariables={
+                'AWS_REGION': config.AWS_REGION,
+                'PROJECT_NAME': config.PROJECT_NAME,
+                'RETURNS_KB_ID': config.RETURNS_KB_ID,
+                'SHIPPING_KB_ID': config.SHIPPING_KB_ID,
+                'WARRANTY_KB_ID': config.WARRANTY_KB_ID,
+                'AGENT_LOG_GROUP': config.AGENT_LOG_GROUP,
+                'GUARDRAIL_ID': guardrail_id,
+                'GUARDRAIL_VERSION': guardrail_version,
+            }
+        )
+    except Exception as e:
+        response = agentcore_control.create_agent_runtime(
+            agentRuntimeName=runtime_name,
+            description="NovaMart Multi-Agent Customer Support System Runtime",
+            roleArn=config.AGENTCORE_ROLE_ARN,
+            networkConfiguration={'networkType': 'PUBLIC'},
+            protocolConfiguration={'protocol': 'MCP'},
+            agentRuntimeArtifact={
+                'artifactLocation': {
+                    's3Location': {
+                        'bucket': config.POLICY_BUCKET,
+                        'prefix': artifact_key,
+                    }
+                },
+                'runtime': 'PYTHON_3_12',
+            },
+            environmentVariables={
+                'AWS_REGION': config.AWS_REGION,
+                'PROJECT_NAME': config.PROJECT_NAME,
+                'RETURNS_KB_ID': config.RETURNS_KB_ID,
+                'SHIPPING_KB_ID': config.SHIPPING_KB_ID,
+                'WARRANTY_KB_ID': config.WARRANTY_KB_ID,
+                'AGENT_LOG_GROUP': config.AGENT_LOG_GROUP,
+                'GUARDRAIL_ID': guardrail_id,
+                'GUARDRAIL_VERSION': guardrail_version,
+            }
+        )
     runtime_arn = response.get('agentRuntimeArn', response.get('arn', ''))
+
     print(f"AgentCore Runtime deployed: {runtime_arn}")
     return runtime_arn
 
@@ -1011,7 +1049,7 @@ def configure_memory(runtime_arn: str) -> str:
         ],
         clientToken=str(uuid.uuid4()),
     )
-    memory_arn = response.get('memoryArn', response.get('arn', ''))
+    memory_arn = response.get('memory', {}).get('arn', response.get('memoryArn', response.get('arn', '')))
     print(f"AgentCore Memory created: {memory_arn}")
     return memory_arn
 

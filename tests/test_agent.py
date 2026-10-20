@@ -25,6 +25,10 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import config
+try:
+    import agent_orchestrator
+except Exception:
+    pass
 
 # ─────────────────────────────────────────────────────
 # HELPER UTILITIES
