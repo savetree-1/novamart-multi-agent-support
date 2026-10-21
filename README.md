@@ -498,6 +498,21 @@ Ensure `configure_observability()` is called and sampling rate is > 0.
 
 ---
 
+## Evidence & Verification
+
+### 1. Automated Test Suite (120/120 pts - 100% PASS)
+All five task test suites executed and verified with a perfect score:
+
+![Automated Test Suite Verification](evidence/test_suite_120_pass.png)
+
+### 2. AWS CloudWatch X-Ray Service Map
+End-to-end distributed tracing graph demonstrating full multi-agent orchestration, Bedrock Knowledge Base RAG parallel retrieval, and DynamoDB storage access:
+
+![AWS X-Ray Service Map](evidence/xray_service_map.png)
+
+---
+
 ## License
 
 [License](../../LICENSE.md)
+
