@@ -500,13 +500,38 @@ Ensure `configure_observability()` is called and sampling rate is > 0.
 
 ## Evidence & Verification
 
-### 1. Automated Test Suite (120/120 pts - 100% PASS)
-All five task test suites executed and verified with a perfect score:
+### 1. End-to-End Orchestrator Execution (`python src/agent_orchestrator.py test`)
+Full multi-agent test execution across Scenario 1 (Return Request), Scenario 2 (Policy Inquiry with ThreadPoolExecutor Parallel Multi-Agent RAG), and Scenario 3 (Calculation & Direct Routing):
+
+![Orchestrator End-to-End Scenarios](evidence/orchestrator_test_scenarios.png)
+
+### 2. Automated Test Suite (120/120 pts - 100% PASS)
+All five task test suites executed and verified with a perfect score (`python tests/test_agent.py`):
 
 ![Automated Test Suite Verification](evidence/test_suite_120_pass.png)
 
-### 2. AWS CloudWatch X-Ray Service Map
-End-to-end distributed tracing graph demonstrating full multi-agent orchestration, Bedrock Knowledge Base RAG parallel retrieval, and DynamoDB storage access:
+### 3. Bedrock Knowledge Bases Console Deployments (Task 5)
+All three Bedrock Knowledge Bases configured with **S3 Vectors** backing store pointing to `VectorStoreBucket`, with matching vector indices and synchronized data sources:
+
+#### A. Returns Policy Knowledge Base (`CCOTBVZRR6`)
+- **Index:** `returns-policy-index` | **Prefix:** `policies/returns/` | **Status:** Available / Synced
+![Returns Policy KB](evidence/aws_kb_returns_policy.png)
+
+#### B. Shipping Policy Knowledge Base (`GBYIBEGJNC`)
+- **Index:** `shipping-policy-index` | **Prefix:** `policies/shipping/` | **Status:** Available / Synced
+![Shipping Policy KB](evidence/aws_kb_shipping_policy.png)
+
+#### C. Warranty Policy Knowledge Base (`C5DXWCMFEJ`)
+- **Index:** `warranty-policy-index` | **Prefix:** `policies/warranty/` | **Status:** Available / Synced
+![Warranty Policy KB](evidence/aws_kb_warranty_policy.png)
+
+### 4. Amazon Bedrock AgentCore Runtime Deployment (Task 3)
+Deployed `udacity_agentcore_runtime` with `PUBLIC` networking, `MCP` protocol, 7-day Session Memory, and attached enterprise safety guardrail (`5vps2c8e9sqy`):
+
+![AgentCore Runtime Deployment](evidence/aws_agentcore_runtime.png)
+
+### 5. AWS CloudWatch X-Ray Service Map (Task 6)
+End-to-end distributed tracing graph demonstrating full multi-agent orchestration, Bedrock Knowledge Base parallel retrieval, and DynamoDB storage access:
 
 ![AWS X-Ray Service Map](evidence/xray_service_map.png)
 
@@ -515,4 +540,3 @@ End-to-end distributed tracing graph demonstrating full multi-agent orchestratio
 ## License
 
 [License](../../LICENSE.md)
-
