@@ -487,7 +487,15 @@ def build_policy_agent() -> Agent:
 
     @tool
     def retrieve_returns_policy(query: str) -> str:
-        """Retrieve relevant passages from the Returns Policy knowledge base."""
+        """
+        Query the Returns Policy knowledge base.
+
+        Args:
+            query: Policy search query
+
+        Returns:
+            Retrieved passages from the returns policy KB
+        """
         return retrieve_from_knowledge_base(config.RETURNS_KB_ID, query)
 
     returns_retriever = Agent(
@@ -499,7 +507,15 @@ def build_policy_agent() -> Agent:
 
     @tool
     def retrieve_shipping_policy(query: str) -> str:
-        """Retrieve relevant passages from the Shipping Policy knowledge base."""
+        """
+        Query the Shipping Policy knowledge base.
+
+        Args:
+            query: Policy search query
+
+        Returns:
+            Retrieved passages from the shipping policy KB
+        """
         return retrieve_from_knowledge_base(config.SHIPPING_KB_ID, query)
 
     shipping_retriever = Agent(
@@ -511,7 +527,15 @@ def build_policy_agent() -> Agent:
 
     @tool
     def retrieve_warranty_policy(query: str) -> str:
-        """Retrieve relevant passages from the Warranty Policy knowledge base."""
+        """
+        Query the Warranty Policy knowledge base.
+
+        Args:
+            query: Policy search query
+
+        Returns:
+            Retrieved passages from the warranty policy KB
+        """
         return retrieve_from_knowledge_base(config.WARRANTY_KB_ID, query)
 
     warranty_retriever = Agent(
@@ -892,12 +916,10 @@ def deploy_to_agentcore_runtime(
     """
     Deploy the multi-agent system to Amazon Bedrock AgentCore Runtime.
 
-    Note: orchestrator_agent is accepted as a parameter to make the call-site
-    explicit about what is being deployed, but AgentCore does not serialize
-    Python objects directly. Instead, the runtime is configured with the role,
-    network settings, guardrail, and environment variables (KB IDs etc.) it
-    needs. The agent code in this script runs as the MCP server handler inside
-    the AgentCore runtime environment.
+    Args:
+        orchestrator_agent: Configured OrchestratorAgent instance
+        guardrail_id: Bedrock guardrail ID
+        guardrail_version: Active version of the guardrail
 
     Returns:
         The AgentCore Runtime ARN
@@ -920,9 +942,7 @@ def deploy_to_agentcore_runtime(
     account_id = sts.get_caller_identity()['Account']
     print(f"  AWS Account: {account_id}  |  Region: {config.AWS_REGION}")
 
-    # NOTE: AgentCore API — guardrail injection.
-    # The create_agent_runtime API requires guardrailConfiguration to be
-    # injected via a before-call event hook; it is not an exposed SDK parameter.
+    # Inject guardrail configuration before API invocation
     guardrail_cfg = {
         'guardrailIdentifier': guardrail_id,
         'guardrailVersion':    guardrail_version,
@@ -937,8 +957,7 @@ def deploy_to_agentcore_runtime(
     )
     print(f"  Guardrail hook registered: {guardrail_id} (v{guardrail_version})")
 
-    # NOTE: AgentCore API — S3 artifact requirement.
-    # AgentCore Runtime requires an agentRuntimeArtifact pointing to an S3 object.
+    # Package and upload deployment artifact to S3
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         zf.writestr('main.py', '# NovaMart AgentCore Runtime entry point\n')
